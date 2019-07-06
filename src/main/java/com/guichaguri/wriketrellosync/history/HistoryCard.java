@@ -5,7 +5,7 @@ import org.json.JSONObject;
 
 import java.util.HashMap;
 
-public class HistoryCard extends Card implements IRelationHolder<Card> {
+public class HistoryCard extends Card {
 
     public static HistoryCard parse(JSONObject obj) {
         HistoryCard card = new HistoryCard();
@@ -40,14 +40,5 @@ public class HistoryCard extends Card implements IRelationHolder<Card> {
     public String getId() {
         return null;
     }
-
-    @Override
-    public String getId(String slug) {
-        return ids.getOrDefault(slug, null);
-    }
-
-    @Override
-    public void setId(String slug, String id) {
-        ids.put(slug, id);
-    }
+    
 }

@@ -4,14 +4,13 @@ import org.json.JSONObject;
 
 import java.util.Objects;
 
-public abstract class Card implements IBoardObject {
+public abstract class Card {
 
     public String name;
     public String description;
     public ColumnType type;
     public int index;
 
-    @Override
     public abstract String getId();
 
     protected void fromJson(JSONObject obj) {
