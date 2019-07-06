@@ -16,7 +16,7 @@ import java.util.Map;
 
 public class WrikeManager implements ISyncManager {
 
-    private static final String API_BASE = "https://www.wrike.com/api/v4";
+    public static final String API_BASE = "https://www.wrike.com/api/v4";
 
     private final String slug, apiToken, folder;
     private final Map<ColumnType, String> customStatuses;

@@ -3,7 +3,10 @@ package com.guichaguri.wriketrellosync;
 import com.guichaguri.wriketrellosync.history.History;
 import com.guichaguri.wriketrellosync.history.HistoryCard;
 import com.guichaguri.wriketrellosync.history.IRelationHolder;
+import kong.unirest.Unirest;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -179,6 +182,33 @@ public class WrikeTrelloSync {
             // Updates all changed cards
             processUpdatedCards(managers, manager, history.cards, cards);
         }
+    }
+
+    public static void main(String[] args) throws IOException {
+        Unirest.config().enableCookieManagement(false);
+
+        File config = new File("config.json");
+        File database = new File("history.json");
+
+        ISyncManager[] managers = null;
+
+        if (config.exists()) {
+            managers = Config.load(config);
+        }
+
+        if (managers == null || managers.length == 0) {
+            managers = Config.wizard(config);
+        }
+
+        History history = new History();
+
+        if (database.exists()) {
+            history.load(database);
+        }
+
+        process(managers, history);
+
+        history.save(database);
     }
 
 }

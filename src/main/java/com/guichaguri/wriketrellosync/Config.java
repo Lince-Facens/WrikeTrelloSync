@@ -9,10 +9,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -21,6 +18,9 @@ import java.util.regex.Pattern;
 
 public class Config {
 
+    /**
+     * Loads the configuration file
+     */
     public static ISyncManager[] load(File file) throws IOException {
         try (FileReader reader = new FileReader(file)) {
             JSONTokener tokener = new JSONTokener(reader);
@@ -78,19 +78,22 @@ public class Config {
         return map;
     }
 
-    public static ISyncManager[] wizard(File file) {
+    /**
+     * Runs a configuration wizard
+     */
+    public static ISyncManager[] wizard(File file) throws IOException {
         Scanner scanner = new Scanner(System.in);
         JSONArray array = new JSONArray();
-        char c;
+        char c = 'Y';
 
         do {
             JSONObject obj = new JSONObject();
 
             System.out.println("Which project management platform you want to configure? (trello/wrike) ");
-            String type = scanner.next("trello|wrike").toLowerCase();
+            String type = scanner.nextLine().trim().toLowerCase();
             obj.put("type", type);
 
-            System.out.println("Choose a unique, short slug for this platform. It'll be the identifier. ");
+            System.out.println("Choose a unique, short slug for this platform. It'll be used as the internal identifier. ");
             obj.put("slug", scanner.nextLine().trim().toLowerCase());
 
             if (type.equals("trello")) {
@@ -99,16 +102,27 @@ public class Config {
 
             } else if (type.equals("wrike")) {
 
-                System.out.println("Wrike API Token: ");
-                obj.put("apiToken", scanner.nextLine().trim());
+                wrikeWizard(scanner, obj);
 
+            } else {
+
+                System.out.println("Platform type '" + type + "' is invalid!");
+                continue;
 
             }
 
-            System.out.println("Configure one more platform? (Y/N) ");
-            c = scanner.next("[YNyn]").toUpperCase().charAt(0);
+            array.put(obj);
 
-        } while (array.length() < 2 || c == 'Y');
+            if (array.length() >= 2) {
+                System.out.println("Configure one more platform? (Y/N) ");
+                c = scanner.nextLine().toUpperCase().charAt(0);
+            }
+
+        } while (c == 'Y');
+
+        try(FileWriter writer = new FileWriter(file)) {
+            array.write(writer);
+        }
 
         return loadManagers(array);
     }
@@ -144,42 +158,7 @@ public class Config {
                 continue;
             }
 
-            ColumnType[] types = ColumnType.values();
-
-            System.out.print("The board was found. Classify each list in the board: ");
-            System.out.print("(Ignore");
-
-            for(ColumnType type : types) {
-                System.out.print(", " + type.name());
-            }
-
-            System.out.println(")");
-
-            JSONArray array = res.getBody().getArray();
-            JSONArray lists = new JSONArray();
-
-            for(int i = 0; i < array.length();) {
-                JSONObject list = array.getJSONObject(i);
-                System.out.println("Type of " + list.getString("name") + ": ");
-                String typeName = scanner.nextLine().trim();
-
-                if (typeName.equalsIgnoreCase("Ignore")) {
-                    i++;
-                    continue;
-                }
-
-                for(ColumnType type : types) {
-                    if (type.name().equalsIgnoreCase(typeName)) {
-                        JSONObject item = new JSONObject();
-                        item.put("type", type);
-                        item.put("id", list.getString("id"));
-                        lists.put(item);
-                        i++;
-                        break;
-                    }
-                }
-
-            }
+            JSONArray lists = trelloWizardLists(scanner, res.getBody().getArray());
 
             obj.put("apiKey", key);
             obj.put("apiToken", token);
@@ -187,6 +166,156 @@ public class Config {
             obj.put("lists", lists);
             break;
         }
+    }
+
+    private static JSONArray trelloWizardLists(Scanner scanner, JSONArray array) {
+        ColumnType[] types = ColumnType.values();
+        JSONArray lists = new JSONArray();
+
+        System.out.print("The board was found. Classify each list in the board: ");
+        System.out.print("(Ignore");
+
+        for(ColumnType type : types) {
+            System.out.print(", " + type.name());
+        }
+
+        System.out.println(")");
+
+        int i = 0;
+        while(i < array.length()) {
+            JSONObject list = array.getJSONObject(i);
+            System.out.println("Type from list '" + list.getString("name") + "': ");
+            String typeName = scanner.nextLine().trim();
+
+            if (typeName.equalsIgnoreCase("Ignore")) {
+                i++;
+                continue;
+            }
+
+            for(ColumnType type : types) {
+                if (type.name().equalsIgnoreCase(typeName)) {
+                    JSONObject item = new JSONObject();
+                    item.put("type", type);
+                    item.put("id", list.getString("id"));
+                    lists.put(item);
+                    i++;
+                    break;
+                }
+            }
+
+        }
+
+        return lists;
+    }
+
+    private static void wrikeWizard(Scanner scanner, JSONObject obj) {
+        while(true) {
+            System.out.println("Wrike API Token: ");
+            String token = scanner.nextLine().trim();
+
+            System.out.println("Validating...");
+
+            HttpResponse<JsonNode> res = Unirest.get(WrikeManager.API_BASE + "/folders")
+                    .header("Authorization", "Bearer " + token)
+                    .asJson();
+
+            if (!res.isSuccess()) {
+                System.out.println("An error occurred: " + res.getBody().toString());
+                continue;
+            }
+
+            System.out.println("\nFolder ID List\n");
+
+            JSONArray data = res.getBody().getObject().getJSONArray("data");
+
+            // Lists all folders
+            for(int i = 0; i < data.length(); i++) {
+                JSONObject folderObj = data.getJSONObject(i);
+                if (!folderObj.getJSONArray("childIds").isEmpty()) continue;
+                System.out.println(folderObj.getString("id") + "\t" + folderObj.getString("title"));
+            }
+
+            System.out.println("\nWrike Folder ID: ");
+            String folder = scanner.nextLine().trim();
+
+            System.out.println("Validating...");
+
+            // Query the folder
+            res = Unirest.get(WrikeManager.API_BASE + "/folders/{id}")
+                    .routeParam("id", folder)
+                    .header("Authorization", "Bearer " + token)
+                    .asJson();
+
+            if (!res.isSuccess()) {
+                System.out.println("An error occurred: " + res.getBody().toString());
+                continue;
+            }
+
+            data = res.getBody().getObject().getJSONArray("data");
+            String workflowId = data.getJSONObject(0).optString("workflowId", null);
+
+            JSONArray statuses = wrikeWizardStatuses(scanner, token, workflowId);
+
+            obj.put("apiToken", token);
+            obj.put("folder", folder);
+            obj.put("customStatuses", statuses);
+            break;
+        }
+    }
+
+    private static JSONArray wrikeWizardStatuses(Scanner scanner, String token, String workflowId) {
+        HttpResponse<JsonNode> res = Unirest.get(WrikeManager.API_BASE + "/workflows")
+                .header("Authorization", "Bearer " + token)
+                .asJson();
+
+        JSONArray workflows = res.getBody().getObject().getJSONArray("data");
+        JSONArray customStatuses = null;
+
+        for(int i = 0; i < workflows.length(); i++) {
+            JSONObject workflow = workflows.getJSONObject(i);
+            if (!workflow.getString("id").equals(workflowId)) continue;
+
+            customStatuses = workflow.getJSONArray("customStatuses");
+            break;
+        }
+
+        ColumnType[] types = ColumnType.values();
+        JSONArray statuses = new JSONArray();
+
+        System.out.print("The folder was found. Classify each status in the folder: ");
+        System.out.print("(Ignore");
+
+        for(ColumnType type : types) {
+            System.out.print(", " + type.name());
+        }
+
+        System.out.println(")");
+
+        int i = 0;
+        while(i < customStatuses.length()) {
+            JSONObject status = customStatuses.getJSONObject(i);
+            System.out.println("Type from status '" + status.getString("name") + "': ");
+            String typeName = scanner.nextLine().trim();
+
+            if (typeName.equalsIgnoreCase("Ignore")) {
+                i++;
+                continue;
+            }
+
+            for(ColumnType type : types) {
+                if (type.name().equalsIgnoreCase(typeName)) {
+                    JSONObject item = new JSONObject();
+                    item.put("type", type);
+                    item.put("id", status.getString("id"));
+                    statuses.put(item);
+                    i++;
+                    break;
+                }
+            }
+
+        }
+
+        return statuses;
     }
 
 }
