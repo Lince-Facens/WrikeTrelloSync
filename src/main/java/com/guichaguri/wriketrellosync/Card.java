@@ -4,7 +4,7 @@ import org.json.JSONObject;
 
 import java.util.Objects;
 
-public abstract class Card {
+public abstract class Card implements Comparable<Card> {
 
     public String name;
     public String description;
@@ -46,6 +46,11 @@ public abstract class Card {
                 type == c.type &&
                 Objects.equals(name, c.name) &&
                 Objects.equals(description, c.description);
+    }
+
+    @Override
+    public int compareTo(Card o) {
+        return Integer.compare(index, o.index);
     }
 
 }

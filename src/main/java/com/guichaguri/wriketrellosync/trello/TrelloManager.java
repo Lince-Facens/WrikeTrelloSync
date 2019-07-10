@@ -9,6 +9,7 @@ import kong.unirest.JsonNode;
 import kong.unirest.Unirest;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.util.*;
 
@@ -50,13 +51,13 @@ public class TrelloManager implements ISyncManager {
 
         for(int i = 0; i < array.length(); i++) {
             JSONObject obj = array.getJSONObject(i);
-
             TrelloCard card = new TrelloCard();
+
             card.id = obj.getString("id");
             card.name = obj.getString("name");
             card.description = obj.optString("desc");
             card.type = Utils.getColumnType(lists, obj.optString("idList"));
-            card.index = obj.optInt("pos", i);
+            card.index = obj.optInt("pos");
 
             cards.add(card);
         }
@@ -64,6 +65,27 @@ public class TrelloManager implements ISyncManager {
         Utils.sortAndNormalizeCards(cards);
 
         return cards;
+    }
+
+    @Override
+    public Card getCard(String cardId) {
+        try {
+            // Retrieve all cards instead so we can have the correct task index calculated
+            List<Card> cards = getCards();
+
+            for(Card card : cards) {
+                if (cardId.equals(card.getId())) return card;
+            }
+
+            // Card Removed
+            return null;
+
+        } catch(Exception ex) {
+
+            // Card Removed
+            return null;
+
+        }
     }
 
     @Override
@@ -115,4 +137,27 @@ public class TrelloManager implements ISyncManager {
             throw new RuntimeException("An error occurred while archiving a Trello card");
         }
     }
+
+    @Override
+    public String handleWebhook(String request) {
+        // Docs on webhooks can be found unofficially on
+        // https://github.com/fiatjaf/trello-webhooks
+
+        JSONTokener tokener = new JSONTokener(request);
+        JSONObject obj = new JSONObject(tokener);
+
+        // Since trello webhooks are a little bit messy and undocumented
+        // We'll just check for the changes by ourselves
+        String type = obj.optString("type", null);
+        if (type == null || !type.toLowerCase().contains("card")) return null;
+
+        obj = obj.optJSONObject("data");
+        if (obj == null) return null;
+
+        obj = obj.optJSONObject("card");
+        if (obj == null) return null;
+
+        return obj.optString("id", null);
+    }
+
 }

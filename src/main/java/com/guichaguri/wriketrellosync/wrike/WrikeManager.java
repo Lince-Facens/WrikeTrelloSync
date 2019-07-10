@@ -4,11 +4,13 @@ import com.guichaguri.wriketrellosync.Card;
 import com.guichaguri.wriketrellosync.ColumnType;
 import com.guichaguri.wriketrellosync.ISyncManager;
 import com.guichaguri.wriketrellosync.Utils;
+import fi.iki.elonen.NanoHTTPD;
 import kong.unirest.HttpResponse;
 import kong.unirest.JsonNode;
 import kong.unirest.Unirest;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +57,7 @@ public class WrikeManager implements ISyncManager {
             card.name = obj.getString("title");
             card.description = obj.optString("description");
             card.type = Utils.getColumnType(customStatuses, obj.optString("customStatusId"));
+            card.priority = obj.optString("priority");
             card.index = i;
 
             cards.add(card);
@@ -63,6 +66,27 @@ public class WrikeManager implements ISyncManager {
         Utils.sortAndNormalizeCards(cards);
 
         return cards;
+    }
+
+    @Override
+    public Card getCard(String cardId) {
+        try {
+            // Retrieve all cards instead so we can have the correct task index calculated
+            List<Card> cards = getCards();
+
+            for(Card card : cards) {
+                if (cardId.equals(card.getId())) return card;
+            }
+
+            // Task Removed
+            return null;
+
+        } catch(Exception ex) {
+
+            // Task Removed
+            return null;
+
+        }
     }
 
     @Override
@@ -111,6 +135,17 @@ public class WrikeManager implements ISyncManager {
         if (!res.isSuccess()) {
             throw new RuntimeException("An error occurred while updating a card: " + res.getBody().toString());
         }
+    }
+
+    @Override
+    public String handleWebhook(String request) {
+        JSONTokener tokener = new JSONTokener(request);
+        JSONObject obj = new JSONObject(tokener);
+
+        String type = obj.optString("eventType", null);
+        if (type == null || !type.startsWith("Task")) return null;
+
+        return obj.optString("taskId", null);
     }
 
 }

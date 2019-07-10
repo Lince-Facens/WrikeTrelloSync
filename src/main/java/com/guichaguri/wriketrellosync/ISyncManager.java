@@ -18,6 +18,13 @@ public interface ISyncManager {
     List<Card> getCards();
 
     /**
+     * Retrieves a card
+     * @param cardId The card id
+     * @return The card object or {@code null} if the card doesn't exist
+     */
+    Card getCard(String cardId);
+
+    /**
      * Creates a card
      * @param card The card to be added
      * @return The card id
@@ -36,5 +43,12 @@ public interface ISyncManager {
      * @param cardId The card id to remove
      */
     void removeCard(String cardId);
+
+    /**
+     * Handles a webhook
+     * @param requestBody
+     * @return The card id to investigate
+     */
+    String handleWebhook(String requestBody);
 
 }

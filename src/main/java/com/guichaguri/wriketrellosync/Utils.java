@@ -1,10 +1,11 @@
 package com.guichaguri.wriketrellosync;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Utils {
+
+    public static final String CONFIG_FILE = "config.json";
+    public static final String DATABASE_FILE = "history.json";
 
     public static ColumnType getColumnType(Map<ColumnType, String> map, String id) {
         for(ColumnType type : map.keySet()) {
@@ -14,7 +15,7 @@ public class Utils {
     }
 
     public static void sortAndNormalizeCards(List<Card> cards) {
-        cards.sort(Comparator.comparingInt(c -> c.index));
+        Collections.sort(cards);
 
         for(ColumnType type : ColumnType.values()) {
             int i = 0;

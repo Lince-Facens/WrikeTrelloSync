@@ -9,7 +9,10 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
-public class WrikeTrelloSync {
+/**
+ * Looks for differences between local cache and propagates the changes into other platforms
+ */
+public class DiffSync {
 
     private static void processAddedCards(ISyncManager[] managers, ISyncManager manager,
                                           List<HistoryCard> before, List<Card> after) {
@@ -35,7 +38,7 @@ public class WrikeTrelloSync {
         }
     }
 
-    private static HistoryCard addCard(ISyncManager[] managers, ISyncManager manager, Card add) {
+    static HistoryCard addCard(ISyncManager[] managers, ISyncManager manager, Card add) {
         System.out.println("Card Added: " + add.name);
 
         HistoryCard card = new HistoryCard();
@@ -80,7 +83,7 @@ public class WrikeTrelloSync {
 
     }
 
-    private static void removeCard(ISyncManager[] managers, ISyncManager manager, HistoryCard card) {
+    static void removeCard(ISyncManager[] managers, ISyncManager manager, HistoryCard card) {
         System.out.println("Card Removed: " + card.name);
 
         // Remove from all managers
@@ -122,7 +125,7 @@ public class WrikeTrelloSync {
 
     }
 
-    private static void updateCard(ISyncManager[] managers, ISyncManager manager, Card card, HistoryCard c) {
+    static void updateCard(ISyncManager[] managers, ISyncManager manager, Card card, HistoryCard c) {
         System.out.println("Card Updated: " + card.name);
 
         // Propagate the change to the other managers
@@ -154,11 +157,37 @@ public class WrikeTrelloSync {
         }
     }
 
+    public static void processTimer(ISyncManager[] managers, History history, File database) {
+        String timerInterval = System.getProperty("timer.interval", "0");
+        int interval = Integer.parseInt(timerInterval);
+
+        if (interval <= 0) {
+            System.out.println("The timer interval is not set.");
+            System.out.println("Set the interval in minutes with -Dtimer.interval=30");
+            return;
+        }
+
+        boolean run = true;
+
+        while (run) {
+            try {
+                Thread.sleep(interval * 60 * 1000);
+                process(managers, history);
+                history.save(database);
+            } catch (InterruptedException ex) {
+                // Interruption, we'll stop the loop
+                run = false;
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
     public static void main(String[] args) throws IOException {
         Unirest.config().enableCookieManagement(false);
 
-        File config = new File("config.json");
-        File database = new File("history.json");
+        File config = new File(Utils.CONFIG_FILE);
+        File database = new File(Utils.DATABASE_FILE);
 
         ISyncManager[] managers = null;
 
@@ -177,8 +206,9 @@ public class WrikeTrelloSync {
         }
 
         process(managers, history);
-
         history.save(database);
+
+        processTimer(managers, history, database);
     }
 
 }
