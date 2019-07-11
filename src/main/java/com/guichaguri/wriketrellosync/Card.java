@@ -8,7 +8,7 @@ public abstract class Card implements Comparable<Card> {
 
     public String name;
     public String description;
-    public ColumnType type;
+    public String type;
     public int index;
 
     public abstract String getId();
@@ -17,7 +17,7 @@ public abstract class Card implements Comparable<Card> {
         name = obj.getString("name");
         description = obj.optString("description");
         index = obj.optInt("index");
-        type = obj.optEnum(ColumnType.class, "type");
+        type = obj.optString("type");
     }
 
     protected JSONObject toJson() {
@@ -43,7 +43,7 @@ public abstract class Card implements Comparable<Card> {
         if (c == null) return false;
 
         return index == c.index &&
-                type == c.type &&
+                type.equals(c.type) &&
                 Objects.equals(name, c.name) &&
                 Objects.equals(description, c.description);
     }

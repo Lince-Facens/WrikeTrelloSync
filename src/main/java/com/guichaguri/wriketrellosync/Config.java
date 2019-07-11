@@ -63,13 +63,13 @@ public class Config {
         return managers;
     }
 
-    private static Map<ColumnType, String> loadColumnMapping(JSONArray mapping) {
-        HashMap<ColumnType, String> map = new HashMap<>();
+    private static Map<String, String> loadColumnMapping(JSONArray mapping) {
+        HashMap<String, String> map = new HashMap<>();
 
         for(int i = 0; i < mapping.length(); i++) {
             JSONObject obj = mapping.getJSONObject(i);
 
-            ColumnType type = obj.getEnum(ColumnType.class, "type");
+            String type = obj.getString("type");
             String id = obj.getString("id");
 
             map.put(type, id);
@@ -169,40 +169,21 @@ public class Config {
     }
 
     private static JSONArray trelloWizardLists(Scanner scanner, JSONArray array) {
-        ColumnType[] types = ColumnType.values();
         JSONArray lists = new JSONArray();
 
-        System.out.print("The board was found. Classify each list in the board: ");
-        System.out.print("(Ignore");
+        System.out.println("The board was found. Classify each list in the board: (Leave empty to ignore the list)");
 
-        for(ColumnType type : types) {
-            System.out.print(", " + type.name());
-        }
-
-        System.out.println(")");
-
-        int i = 0;
-        while(i < array.length()) {
+        for(int i = 0; i < array.length(); i++) {
             JSONObject list = array.getJSONObject(i);
             System.out.println("Type from list '" + list.getString("name") + "': ");
             String typeName = scanner.nextLine().trim();
 
-            if (typeName.equalsIgnoreCase("Ignore")) {
-                i++;
-                continue;
-            }
+            if (typeName.isEmpty()) continue;
 
-            for(ColumnType type : types) {
-                if (type.name().equalsIgnoreCase(typeName)) {
-                    JSONObject item = new JSONObject();
-                    item.put("type", type);
-                    item.put("id", list.getString("id"));
-                    lists.put(item);
-                    i++;
-                    break;
-                }
-            }
-
+            JSONObject item = new JSONObject();
+            item.put("type", typeName);
+            item.put("id", list.getString("id"));
+            lists.put(item);
         }
 
         return lists;
@@ -279,40 +260,21 @@ public class Config {
             break;
         }
 
-        ColumnType[] types = ColumnType.values();
         JSONArray statuses = new JSONArray();
 
-        System.out.print("The folder was found. Classify each status in the folder: ");
-        System.out.print("(Ignore");
+        System.out.println("The folder was found. Classify each status in the folder: (Leave it empty to ignore the status)");
 
-        for(ColumnType type : types) {
-            System.out.print(", " + type.name());
-        }
-
-        System.out.println(")");
-
-        int i = 0;
-        while(i < customStatuses.length()) {
+        for(int i = 0; i < customStatuses.length(); i++) {
             JSONObject status = customStatuses.getJSONObject(i);
             System.out.println("Type from status '" + status.getString("name") + "': ");
             String typeName = scanner.nextLine().trim();
 
-            if (typeName.equalsIgnoreCase("Ignore")) {
-                i++;
-                continue;
-            }
+            if (typeName.isEmpty()) continue;
 
-            for(ColumnType type : types) {
-                if (type.name().equalsIgnoreCase(typeName)) {
-                    JSONObject item = new JSONObject();
-                    item.put("type", type);
-                    item.put("id", status.getString("id"));
-                    statuses.put(item);
-                    i++;
-                    break;
-                }
-            }
-
+            JSONObject item = new JSONObject();
+            item.put("type", typeName);
+            item.put("id", status.getString("id"));
+            statuses.put(item);
         }
 
         return statuses;

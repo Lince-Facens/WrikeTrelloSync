@@ -1,9 +1,9 @@
 package com.guichaguri.wriketrellosync.trello;
 
 import com.guichaguri.wriketrellosync.Card;
-import com.guichaguri.wriketrellosync.ColumnType;
 import com.guichaguri.wriketrellosync.ISyncManager;
 import com.guichaguri.wriketrellosync.Utils;
+import kong.unirest.HttpRequestWithBody;
 import kong.unirest.HttpResponse;
 import kong.unirest.JsonNode;
 import kong.unirest.Unirest;
@@ -18,9 +18,9 @@ public class TrelloManager implements ISyncManager {
     public static final String API_BASE = "https://api.trello.com/1";
 
     private final String slug, apiKey, apiToken, board;
-    private final Map<ColumnType, String> lists;
+    private final Map<String, String> lists;
 
-    public TrelloManager(String slug, String apiKey, String apiToken, String board, Map<ColumnType, String> lists) {
+    public TrelloManager(String slug, String apiKey, String apiToken, String board, Map<String, String> lists) {
         this.slug = slug;
         this.apiKey = apiKey;
         this.apiToken = apiToken;
@@ -35,7 +35,8 @@ public class TrelloManager implements ISyncManager {
 
     @Override
     public List<Card> getCards() {
-        HttpResponse<JsonNode> res = Unirest.get(API_BASE + "/lists/{id}/cards")
+        HttpResponse<JsonNode> res = Unirest.get(API_BASE + "/boards/{id}/cards")
+                .routeParam("id", board)
                 .queryString("cards", "visible") // Filter only cards not archived
                 .queryString("filter", "visible")
                 .queryString("key", apiKey)
@@ -62,7 +63,7 @@ public class TrelloManager implements ISyncManager {
             cards.add(card);
         }
 
-        Utils.sortAndNormalizeCards(cards);
+        Utils.sortAndNormalizeCards(lists, cards);
 
         return cards;
     }
@@ -90,6 +91,10 @@ public class TrelloManager implements ISyncManager {
 
     @Override
     public String addCard(Card card) {
+        if (lists.containsKey(card.type)) {
+            return null;
+        }
+
         HttpResponse<JsonNode> res = Unirest.post(API_BASE + "/cards")
                 .queryString("name", card.name)
                 .queryString("desc", card.description)
@@ -100,7 +105,7 @@ public class TrelloManager implements ISyncManager {
                 .asJson();
 
         if (!res.isSuccess()) {
-            throw new RuntimeException("An error occurred while creating a new Trello card");
+            throw new RuntimeException("An error occurred while creating a new Trello card: " + res.getStatusText());
         }
 
         JSONObject data = res.getBody().getObject();
@@ -109,15 +114,17 @@ public class TrelloManager implements ISyncManager {
 
     @Override
     public void updateCard(String cardId, Card card) {
-        HttpResponse<JsonNode> res = Unirest.put(API_BASE + "/cards/{id}")
+        HttpRequestWithBody req = Unirest.put(API_BASE + "/cards/{id}")
                 .routeParam("id", cardId)
                 .queryString("name", card.name)
                 .queryString("desc", card.description)
-                .queryString("idList", lists.get(card.type))
-                .queryString("idBoard", board)
                 .queryString("key", apiKey)
-                .queryString("token", apiToken)
-                .asJson();
+                .queryString("token", apiToken);
+
+        if (lists.containsKey(card.type))
+            req.queryString("idList", lists.get(card.type));
+
+        HttpResponse<JsonNode> res = req.asJson();
 
         if (!res.isSuccess()) {
             throw new RuntimeException("An error occurred while updating a Trello card\n" + res.getBody().toString());

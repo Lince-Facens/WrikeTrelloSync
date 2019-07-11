@@ -1,10 +1,8 @@
 package com.guichaguri.wriketrellosync.wrike;
 
 import com.guichaguri.wriketrellosync.Card;
-import com.guichaguri.wriketrellosync.ColumnType;
 import com.guichaguri.wriketrellosync.ISyncManager;
 import com.guichaguri.wriketrellosync.Utils;
-import fi.iki.elonen.NanoHTTPD;
 import kong.unirest.HttpResponse;
 import kong.unirest.JsonNode;
 import kong.unirest.Unirest;
@@ -21,9 +19,9 @@ public class WrikeManager implements ISyncManager {
     public static final String API_BASE = "https://www.wrike.com/api/v4";
 
     private final String slug, apiToken, folder;
-    private final Map<ColumnType, String> customStatuses;
+    private final Map<String, String> customStatuses;
 
-    public WrikeManager(String slug, String apiToken, String folder, Map<ColumnType, String> customStatuses) {
+    public WrikeManager(String slug, String apiToken, String folder, Map<String, String> customStatuses) {
         this.slug = slug;
         this.apiToken = apiToken;
         this.folder = folder;
@@ -63,7 +61,7 @@ public class WrikeManager implements ISyncManager {
             cards.add(card);
         }
 
-        Utils.sortAndNormalizeCards(cards);
+        Utils.sortAndNormalizeCards(customStatuses, cards);
 
         return cards;
     }
@@ -95,7 +93,7 @@ public class WrikeManager implements ISyncManager {
                 .routeParam("id", folder)
                 .field("title", card.name)
                 .field("description", card.description)
-                .field("customStatus", customStatuses.getOrDefault(card.type, null))
+                .field("customStatus", customStatuses.getOrDefault(card.type, ""))
                 //.field("responsibles", ) TODO
                 .header("Authorization", "Bearer " + apiToken)
                 .asJson();
@@ -127,7 +125,7 @@ public class WrikeManager implements ISyncManager {
                 .routeParam("id", cardId)
                 .field("title", card.name)
                 .field("description", card.description)
-                .field("customStatus", customStatuses.getOrDefault(card.type, null))
+                .field("customStatus", customStatuses.getOrDefault(card.type, ""))
                 .header("Authorization", "Bearer " + apiToken)
                 //.field("responsibles", ) TODO
                 .asJson();

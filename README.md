@@ -1,4 +1,4 @@
-# wrikeTrelloSync
+# WrikeTrelloSync
 
 A simple tool that provides bidirectional synchronization between Trello cards and Wrike tasks.
 

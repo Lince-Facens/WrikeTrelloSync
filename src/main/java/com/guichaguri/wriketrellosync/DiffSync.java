@@ -47,7 +47,11 @@ public class DiffSync {
 
         for (ISyncManager manager2 : managers) {
             if (manager2 != manager) {
-                card.ids.put(manager2.getSlug(), manager2.addCard(add));
+                try {
+                    card.ids.put(manager2.getSlug(), manager2.addCard(add));
+                } catch(Exception ex) {
+                    ex.printStackTrace();
+                }
             }
         }
 
@@ -94,7 +98,11 @@ public class DiffSync {
                 String id = card.ids.getOrDefault(slug2, null);
 
                 if (id != null) {
-                    manager2.removeCard(id);
+                    try {
+                        manager2.removeCard(id);
+                    } catch(Exception ex) {
+                        ex.printStackTrace();
+                    }
                 }
             }
         }
@@ -135,7 +143,11 @@ public class DiffSync {
                 String slug2 = manager2.getSlug();
 
                 if (c.ids.containsKey(slug2)) {
-                    manager2.updateCard(c.ids.get(slug2), card);
+                    try {
+                        manager2.updateCard(c.ids.get(slug2), card);
+                    } catch(Exception ex) {
+                        ex.printStackTrace();
+                    }
                 }
 
             }
