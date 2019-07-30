@@ -2,7 +2,7 @@
 
 A simple tool that provides bidirectional synchronization between Trello cards and Wrike tasks.
 
-At the moment, it only synchronizes the title, description, column, and position.
+At the moment, it only synchronizes the title, description, column, position and assigned users.
 
 ## Usage
 ### Requirements
@@ -42,11 +42,11 @@ $ java -cp WrikeTrelloSync.jar -Dwebhook.hostname=127.0.0.1 -Dwebhook.port=8091 
 ```
 
 ## TODO
-* Add synchronization for assigned users
 * Automatically register the webhook
+* Synchronize positions back to Trello properly
 
 ## Implementation Notes
-* If you're running it for the first time, only one of the platforms can be populated with cards, otherwise you'll end up with duplicates.
+* If you're running it for the first time, all existing cards will be created on the other platforms automatically.
 * Trello cards are always archived instead of being deleted.
 
 ## Contributors

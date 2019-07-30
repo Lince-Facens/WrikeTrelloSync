@@ -144,7 +144,7 @@ public class DiffSync {
 
                 if (c.ids.containsKey(slug2)) {
                     try {
-                        manager2.updateCard(c.ids.get(slug2), card);
+                        manager2.updateCard(c.ids.get(slug2), card, c);
                     } catch(Exception ex) {
                         ex.printStackTrace();
                     }

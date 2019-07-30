@@ -44,14 +44,16 @@ public class Config {
                         obj.getString("apiKey"),
                         obj.getString("apiToken"),
                         obj.getString("board"),
-                        loadColumnMapping(obj.getJSONArray("lists")));
+                        loadMapping(obj.getJSONObject("lists")),
+                        loadMapping(obj.getJSONObject("users")));
 
             } else if (type.equals("wrike")) {
 
                 managers[i] = new WrikeManager(slug,
                         obj.getString("apiToken"),
                         obj.getString("folder"),
-                        loadColumnMapping(obj.getJSONArray("customStatuses")));
+                        loadMapping(obj.getJSONObject("customStatuses")),
+                        loadMapping(obj.getJSONObject("contacts")));
 
             } else {
 
@@ -63,16 +65,11 @@ public class Config {
         return managers;
     }
 
-    private static Map<String, String> loadColumnMapping(JSONArray mapping) {
+    private static Map<String, String> loadMapping(JSONObject mapping) {
         HashMap<String, String> map = new HashMap<>();
 
-        for(int i = 0; i < mapping.length(); i++) {
-            JSONObject obj = mapping.getJSONObject(i);
-
-            String type = obj.getString("type");
-            String id = obj.getString("id");
-
-            map.put(type, id);
+        for(String id : mapping.keySet()) {
+            map.put(id, mapping.getString(id));
         }
 
         return map;
@@ -158,18 +155,34 @@ public class Config {
                 continue;
             }
 
-            JSONArray lists = trelloWizardLists(scanner, res.getBody().getArray());
+            JSONObject lists = trelloWizardLists(scanner, res.getBody().getArray());
+
+            System.out.println("Fetching users...");
+
+            res = Unirest.get(TrelloManager.API_BASE + "/boards/{id}/members")
+                    .routeParam("id", id)
+                    .queryString("key", key)
+                    .queryString("token", token)
+                    .asJson();
+
+            if (!res.isSuccess()) {
+                System.out.println("An error occurred: " + res.getBody().toString());
+                continue;
+            }
+
+            JSONObject users = trelloWizardUsers(scanner, res.getBody().getArray());
 
             obj.put("apiKey", key);
             obj.put("apiToken", token);
             obj.put("board", id);
             obj.put("lists", lists);
+            obj.put("users", users);
             break;
         }
     }
 
-    private static JSONArray trelloWizardLists(Scanner scanner, JSONArray array) {
-        JSONArray lists = new JSONArray();
+    private static JSONObject trelloWizardLists(Scanner scanner, JSONArray array) {
+        JSONObject lists = new JSONObject();
 
         System.out.println("The board was found. Classify each list in the board: (Leave empty to ignore the list)");
 
@@ -180,13 +193,29 @@ public class Config {
 
             if (typeName.isEmpty()) continue;
 
-            JSONObject item = new JSONObject();
-            item.put("type", typeName);
-            item.put("id", list.getString("id"));
-            lists.put(item);
+            lists.put(typeName, list.getString("id"));
         }
 
         return lists;
+    }
+
+    private static JSONObject trelloWizardUsers(Scanner scanner, JSONArray array) {
+        JSONObject users = new JSONObject();
+
+        System.out.println("Give each user a unique username. (It has to match between platforms to sync correctly)");
+        System.out.println("Leave it empty to skip a user");
+
+        for(int i = 0; i < array.length(); i++) {
+            JSONObject data = array.getJSONObject(i);
+            System.out.println("Username for '" + data.getString("fullName") + "': ");
+            String username = scanner.nextLine().trim();
+
+            if (username.isEmpty()) continue;
+
+            users.put(username, data.getString("id"));
+        }
+
+        return users;
     }
 
     private static void wrikeWizard(Scanner scanner, JSONObject obj) {
@@ -233,18 +262,22 @@ public class Config {
             }
 
             data = res.getBody().getObject().getJSONArray("data");
-            String workflowId = data.getJSONObject(0).optString("workflowId", null);
+            JSONObject folderData = data.getJSONObject(0);
 
-            JSONArray statuses = wrikeWizardStatuses(scanner, token, workflowId);
+            String workflowId = folderData.optString("workflowId", null);
+
+            JSONObject statuses = wrikeWizardStatuses(scanner, token, workflowId);
+            JSONObject contacts = wrikeWizardContacts(scanner, token, folderData.getJSONArray("sharedIds"));
 
             obj.put("apiToken", token);
             obj.put("folder", folder);
             obj.put("customStatuses", statuses);
+            obj.put("contacts", contacts);
             break;
         }
     }
 
-    private static JSONArray wrikeWizardStatuses(Scanner scanner, String token, String workflowId) {
+    private static JSONObject wrikeWizardStatuses(Scanner scanner, String token, String workflowId) {
         HttpResponse<JsonNode> res = Unirest.get(WrikeManager.API_BASE + "/workflows")
                 .header("Authorization", "Bearer " + token)
                 .asJson();
@@ -260,8 +293,9 @@ public class Config {
             break;
         }
 
-        JSONArray statuses = new JSONArray();
+        JSONObject statuses = new JSONObject();
 
+        System.out.println();
         System.out.println("The folder was found. Classify each status in the folder: (Leave it empty to ignore the status)");
 
         for(int i = 0; i < customStatuses.length(); i++) {
@@ -271,13 +305,53 @@ public class Config {
 
             if (typeName.isEmpty()) continue;
 
-            JSONObject item = new JSONObject();
-            item.put("type", typeName);
-            item.put("id", status.getString("id"));
-            statuses.put(item);
+            statuses.put(typeName, status.getString("id"));
         }
 
         return statuses;
+    }
+
+    private static JSONObject wrikeWizardContacts(Scanner scanner, String token, JSONArray array) {
+        JSONObject contacts = new JSONObject();
+
+        if (array.isEmpty()) return contacts;
+
+        System.out.println();
+        System.out.println("Fetching...");
+
+        StringBuilder ids = new StringBuilder();
+
+        for(int i = 0; i < array.length(); i++) {
+            if (ids.length() > 0) ids.append(',');
+            ids.append(array.getString(i));
+        }
+
+        HttpResponse<JsonNode> res = Unirest.get(WrikeManager.API_BASE + "/contacts/{ids}")
+                .routeParam("ids", ids.toString())
+                .header("Authorization", "Bearer " + token)
+                .asJson();
+
+        if (!res.isSuccess()) {
+            System.out.println("An error occurred while fetching the users: " + res.getStatusText());
+            return contacts;
+        }
+
+        System.out.println("Give each user a unique username. (It has to match between platforms to sync correctly)");
+        System.out.println("Leave it empty to skip a user");
+
+        array = res.getBody().getArray();
+
+        for(int i = 0; i < array.length(); i++) {
+            JSONObject data = array.getJSONObject(i);
+            System.out.println("Username for '" + data.getString("firstName") + " " + data.getString("lastName") + "': ");
+            String username = scanner.nextLine().trim();
+
+            if (username.isEmpty()) continue;
+
+            contacts.put(username, data.getString("id"));
+        }
+
+        return contacts;
     }
 
 }

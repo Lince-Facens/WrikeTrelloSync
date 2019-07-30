@@ -36,7 +36,7 @@ public interface ISyncManager {
      * @param cardId The card id to update
      * @param card The card data
      */
-    void updateCard(String cardId, Card card);
+    void updateCard(String cardId, Card card, Card previous);
 
     /**
      * Removes a card
